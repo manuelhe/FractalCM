@@ -7,52 +7,52 @@ Version 0.4.2
 http://www.greaterscope.net/projects/dbFacile
 
 Notes:
-functions declared starting with _ like _func() indicate functions that are not actually declareted in this class, 
+functions declared starting with _ like _func() indicate functions that are not actually declareted in this class,
 but have to be implemented on the extended classes (eg. Database_mysql );
 */
 
 abstract class Database {
 	protected $connection; 				// Database connection resource
 	protected $name; 					// connection name
-	
+
 	private static $types = array('mysql', 'odbc');
-	
+
 	protected $result;					//used to store results
-	
+
 	public static $instance; 			// last created instance
 	protected $instance_id;				//used to store $this instance number
 	public static $last_instance_id;	//used to store $this instance number
 	public static $instances = array();	// for holding more than 1 instance
-	
+
 	//general construct
 	function __construct() {
-		
+
 		//get options
 		$args=Utils::combine_args(func_get_args(), 0, array('name' => null, 'resource' => null));
-		
+
 		$this->connection = $args['resource'];
 		$this->result = null;
 		$this->parameters = array();
 
 		Database::$instance = &$this;						//set's this instance as the last added one
-		
+
 		Database::$instances[] = &$this;					//add's the instance on top of the the instance stack
 		$this->instance_id = ++Database::$last_instance_id;	//set's $this instance_id
-		
+
 		if($args['name']) Database::$instances[$args['name']] = &$this;		//add's the instance to the instance stack with the provided name
 	}
-	
+
 	//general open
 	public static function open() {
-		
+
 		//get options
 		$args=Utils::combine_args(func_get_args(), 0, array('type' => 'mysql'));
-		
+
 		if(!in_array($args['type'], Database::$types)){
 			trigger_error('<strong>Database</strong> :: Unrecognized database type "'.$type.'"', E_USER_ERROR);
 			return null;
 		}
-		
+
 		//creates the instance
 		$class='Database_'.$args['type'];
 		$o = new $class($args);
@@ -60,24 +60,24 @@ abstract class Database {
 
 		return $o;
 	}
-	
+
 	//close connection and remove references to instance
 	function close() {
 		$this->close();
 		unset(Database::$instances[$this->instance_id]);
 		if($this->instance_id==Database::$last_instance_id) unset(Database::$instance);
 	}
-	
+
 	//secure string
 	function secure($sql, $parameters=array()){
 		if(!empty($parameters)){
 			return vsprintf(str_replace("?", "%s", str_replace("%", "%%", $sql)), $this->escapeValues($parameters));
 		} else return $sql;
 	}
-	
-	//builds query conditions from $args into $sql 
+
+	//builds query conditions from $args into $sql
 	function build_query_conditions($sql, $args){
-		
+
 		//where
 		if(is_string($args['where'])){
 			$sql .= ' where '.$args['where'];
@@ -85,7 +85,7 @@ abstract class Database {
 			$where = array_shift($args['where']);
 			$sql .= ' where '.$this->secure($where, $args['where']);
 		}
-		
+
 		//group
 		if(is_string($args['group'])){
 			$sql.=' group by '.$args['group'];
@@ -93,7 +93,7 @@ abstract class Database {
 			$group = array_shift($args['group']);
 			$sql .= ' where '.$this->secure($group, $args['group']);
 		}
-		
+
 		//order
 		if(is_string($args['order'])){
 			$sql.=' order by '.$args['order'];
@@ -101,11 +101,11 @@ abstract class Database {
 			$order = array_shift($args['order']);
 			$sql .= ' where '.$this->secure($order, $args['order']);
 		}
-		
+
 		//limit (depends on sql system)
 		return $this->_limit($sql, $args['limit']);
 	}
-	
+
 	//escape value function
 	public function escapeValue($str){
 		switch (gettype($str)){
@@ -121,7 +121,7 @@ abstract class Database {
 		}
 		return $str;
 	}
-	
+
 	//escape values array
 	function escapeValues($arr){
 		$key = array_keys($arr);
@@ -129,7 +129,7 @@ abstract class Database {
 		for ($i=0; $i<$size; $i++) $arr[$key[$i]] = $this->escapeValue($arr[$key[$i]]);
 		return $arr;
 	}
-	
+
 	//escape fields array
 	function escapeFields($arr){
 		$key = array_keys($arr);
@@ -137,42 +137,42 @@ abstract class Database {
 		for ($i=0; $i<$size; $i++) $arr[$key[$i]] = $this->_escapeField($arr[$key[$i]]);
 		return $arr;
 	}
-	
-	
-	
-	
+
+
+
+
 	/*
 	 * Performs a query using the given string and parameters.
 	 * Used by the other query functions.
 	 * */
 	function execute($sql, $parameters = array()) {
-		
+
 		//benchmarking is important
 		$time_start = microtime(true);
-		 
+
 		//put all the parameters into the sql
 		$fullSql = $this->secure($sql, $parameters);
-		
+
 		$this->result = $this->_query($fullSql); // sets $this->result
-		
+
 		//trigger notice
 		trigger_error('<strong>Database</strong> :: ' . $fullSql . " :: <small>" . (number_format(microtime(true) - $time_start, 8))." secs</small>", E_USER_NOTICE);
-		
+
 		//if there's an error, report it
 		if(!$this->result && (error_reporting() & 1))
 			trigger_error('<strong>Database</strong> :: Error in query: ' . $this->_error(), E_USER_WARNING);
-		
+
 		return $this->result?true:false;
 	}
-	
+
 	//insert
 	function insert($data, $table){
-		
+
 		$parameters=array();
-		
+
 		//insert query
 		$sql = 'insert into ' . $this->_escapeField($table);
-		
+
 		if(!empty($data)){	//insert data
       $sql .= ' (';
       $values = 'values(';
@@ -182,13 +182,13 @@ abstract class Database {
 				$parameters[] = $value;
 			}
 			$sql = substr($sql, 0, -1).') '.substr($values, 0, -1).')'; // strip off last commas and concat the sql statement
-			
+
 		} else {
       		$sql .= $this->_insert_default_values();
     	}
-		
-		
-		//execute	
+
+
+		//execute
 		if($this->execute($sql, $parameters)) {
 			//return inserted id
 			return $this->_lastID($table);
@@ -196,15 +196,15 @@ abstract class Database {
 			return false;
 		}
 	}
-	
+
 	//update
 	function update($data, $table){
-		
+
 		//get options
 		$args=Utils::combine_args(func_get_args(), 2, array('where'=>null, 'group'=>null, 'order'=>null, 'limit'=>null));
-		
+
 		$parameters=array();
-		
+
 		//create base query
 		$sql = 'update ' . $this->_escapeField($table);
 		if(!empty($data)){	//insert data
@@ -214,46 +214,46 @@ abstract class Database {
 				$parameters[] = $value;
 			}
 			$sql = substr($sql, 0, -1); // strip off last comma
-			
+
 		} else {	//no data to insert
 			$sql = $sql.') '.$values.')'; // strip off last commas and concat the sql statement
 		}
-		
-		
+
+
 		//insert query conditions (sql is changed by reference)
 		$sql = $this->build_query_conditions($sql, $args);
-		
+
 		//execute
 		$this->execute($sql, $parameters);
-		
+
 		//return affected rows
 		return $this->_affectedRows();
 	}
-	
+
 	//delete
 	function delete($table) {
-		
+
 		//get options
 		$args=Utils::combine_args(func_get_args(), 1, array('where'=>null, 'group'=>null, 'order'=>null, 'limit'=>null));
-		
+
 		//create base query
 		$sql = 'delete from ' . $table;
-		
+
 		//insert query conditions (sql is changed by reference)
 		$sql = $this->build_query_conditions($sql, $args);
-		
+
 		//execute
 		$this->execute($sql);
-		
+
 		//return affected rows
 		return $this->_affectedRows();
 	}
-	
+
 	//number of available rows in $this->result
 	function numberRows(){
 		return $this->_numberRows();
 	}
-	
+
 	/*
 	 * Fetches all of the rows (associatively) from the query.
 	 * Most other retrieval functions build off this
@@ -265,10 +265,10 @@ abstract class Database {
 			return $this->_fetchAll();
 		}
 		// no records, thus return empty array
-		// which should evaluate to false, and will prevent foreach notices/warnings 
+		// which should evaluate to false, and will prevent foreach notices/warnings
 		return array();
 	}
-	
+
 	/*
 	 * This is intended to be the method used for large result sets.
 	 * It is intended to return an iterator, and act upon buffered data.
