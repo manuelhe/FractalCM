@@ -156,7 +156,7 @@ abstract class Database {
 		$this->result = $this->_query($fullSql); // sets $this->result
 
 		//trigger notice
-		trigger_error('<strong>Database</strong> :: ' . $fullSql . " :: <small>" . (number_format(microtime(true) - $time_start, 8))." secs</small>", E_USER_NOTICE);
+		//trigger_error('<strong>Database</strong> :: ' . $fullSql . " :: <small>" . (number_format(microtime(true) - $time_start, 8))." secs</small>", E_USER_NOTICE);
 
 		//if there's an error, report it
 		if(!$this->result && (error_reporting() & 1))
