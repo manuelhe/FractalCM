@@ -4,6 +4,7 @@ class ContentMap {
     private static $flatMap          = array();
     private static $relMap           = array();
     private static $contentParams    = array();
+    private static $db               = null;
     /**
      *
      * General instance method
@@ -24,8 +25,9 @@ class ContentMap {
      * @return object ContentMap instance
      */
     static function init($contentId=1){
-        $contentId = intval($contentId,10);
+        $contentId       = intval($contentId,10);
         self::$contentId = $contentId ? $contentId : self::$contentId;
+        self::$db        = Database::open(array('type'=>'mysql','database'=>'fractalcms_db1', 'user'=>'root', 'password'=>'zemoga'));
         self::buildMap();
         return self::getInstance();
     }
@@ -33,10 +35,9 @@ class ContentMap {
         self::mapFromDb();
     }
     private static function mapFromDb(){
-        $db = Database::open(array('type'=>'mysql','database'=>'fractalcms_db1', 'user'=>'root', 'password'=>'zemoga'));
         $q1 = sprintf("SELECT `%s`,`%s`,`%s`,`%s`,`%s`,`%s`,`%s`,`%s`,`%s`,`%s`,`%s`,`%s`,`%s`,`%s`,`%s` FROM `%s` ORDER BY `%s`, `%s`"
             ,DbConf::$_CONT_ID
-            ,DbConf::$_CONT_contentId
+            ,DbConf::$_CONT_PARENTID
             ,DbConf::$_CONT_MAP
             ,DbConf::$_CONT_VISIBLE
             ,DbConf::$_CONT_TITLE
@@ -51,20 +52,20 @@ class ContentMap {
             ,DbConf::$_CONT_DATE
             ,DbConf::$_CONT_ORDER
             ,DbConf::$_TCONTENT
-            ,DbConf::$_CONT_contentId
+            ,DbConf::$_CONT_PARENTID
             ,DbConf::$_CONT_ID
         );
-        $r1 = $db->fetch($q1);
-        if (!$db->numberRows()) {
+        $r1 = self::$db->fetch($q1);
+        if (!self::$db->numberRows()) {
             trigger_error('<strong>ContentMap</strong> :: ERROR001: No data in Content table', E_USER_ERROR);
             return false;
         }
         $level = 1;
         foreach ($r1 as $d1) {
-            if($d1[DbConf::$_CONT_contentId]>0){
-                $level = self::$flatMap[$d1[DbConf::$_CONT_contentId]][DbConf::$_CONT_LEVELID]+1;
+            if($d1[DbConf::$_CONT_PARENTID]>0){
+                $level = self::$flatMap[$d1[DbConf::$_CONT_PARENTID]][DbConf::$_CONT_LEVELID]+1;
             }
-            self::$relMap[$level][$d1[DbConf::$_CONT_contentId]][$d1[DbConf::$_CONT_ID]]= array(
+            self::$relMap[$level][$d1[DbConf::$_CONT_PARENTID]][$d1[DbConf::$_CONT_ID]]= array(
                 DbConf::$_CONT_TITLE    => $d1[DbConf::$_CONT_TITLE]
                 ,DbConf::$_CONT_VISIBLE => $d1[DbConf::$_CONT_VISIBLE]
                 ,DbConf::$_CONT_MAP     => $d1[DbConf::$_CONT_MAP]
@@ -81,7 +82,7 @@ class ContentMap {
             );
             self::$flatMap[$d1[DbConf::$_CONT_ID]]= array(
                 DbConf::$_CONT_LEVELID  => $level
-                ,DbConf::$_CONT_contentId=> $d1[DbConf::$_CONT_contentId]
+                ,DbConf::$_CONT_PARENTID=> $d1[DbConf::$_CONT_PARENTID]
                 ,DbConf::$_CONT_TITLE   => $d1[DbConf::$_CONT_TITLE]
                 ,DbConf::$_CONT_VISIBLE => $d1[DbConf::$_CONT_VISIBLE]
                 ,DbConf::$_CONT_MAP     => $d1[DbConf::$_CONT_MAP]
@@ -116,10 +117,10 @@ class ContentMap {
         $contentId = intval($contentId,10);
         $contentId = $contentId ? $contentId : self::$contentId;
         global $configVars;
-        $db = Database::open(array('type'=>'mysql','database'=>'fractalcms_db1', 'user'=>'root', 'password'=>'zemoga'));
+
         $q1	= "SELECT ".DbConf::$_CONT_PARAMS." FROM ".DbConf::$_TCONTENT." WHERE ".DbConf::$_CONT_ID."=?";
-        $r1 = $db->fetchCell($q1,array($contentId));
-        if (!$db->numberRows()) {
+        $r1 = self::$db->fetchCell($q1,array($contentId));
+        if (!self::$db->numberRows()) {
             //trigger_error('<strong>ContentMap</strong> :: ERROR003: No Params in selected content', E_USER_ERROR);
             return false;
         }
@@ -157,7 +158,7 @@ class ContentMap {
 				    DbConf::$_CONT_TITLE     => self::$flatMap[$contentId][DbConf::$_CONT_TITLE]
 				);
 			}
-			$contentId		= self::$flatMap[$contentId][DbConf::$_CONT_contentId];
+			$contentId		= self::$flatMap[$contentId][DbConf::$_CONT_PARENTID];
 		}
 		if(is_array($path)){
 		    $path	= array_reverse($path);
@@ -187,39 +188,63 @@ class ContentMap {
 			}
 			return self::$flatMap[$contentId];
 		}
-		return self::property(self::$flatMap[$contentId][DbConf::$_CONT_contentId],$field,$returnValue,$inheritedValue);
+		return self::property(self::$flatMap[$contentId][DbConf::$_CONT_PARENTID],$field,$returnValue,$inheritedValue);
 	}
 	/**
 	 *
 	 * Retruns all Content data
-	 * @param integer $contentId
+	 * @param mixed $contentId If an array value is submited, it returns and array with all founded content data
 	 * @param bool $breakLines Returns break lines as HTML BRs
 	 * @return array
 	 */
 	public static function data($contentId=false,$breakLines=false){
-	    $contentId   = intval($contentId,10);
-        $contentId   = $contentId ? $contentId : self::$contentId;
+	    $group = false;
+	    if(is_array($contentId) && count($contentId)){
+	        while (list($k,$v) = each($contentId)){
+	            $v = intval($v,10);
+	            if($v){
+	                continue;
+	            }
+                unset($contentId[$k]);
+	        }
+	        if(!count($contentId)){
+	            return false;
+	        }
+	        $group = true;
+	    }else{
+    	    $contentId   = intval($contentId,10);
+            $contentId   = $contentId ? $contentId : self::$contentId;
+	    }
 
-        $db = Database::open(array('type'=>'mysql','database'=>'fractalcms_db1', 'user'=>'root', 'password'=>'zemoga'));
-		$q1	= sprintf("SELECT * FROM `%s` WHERE `%s`='?'"
+		$q1	= sprintf("SELECT * FROM `%s` WHERE `%s` %s %s"
 			,DbConf::$_TCONTENT
 			,DbConf::$_CONT_ID
+			,$group ? 'IN' : '='
+		    ,$group ? '('.implode(',', $contentId).')' : "'".$contentId."'"
 		);
-		$r1	= $db->fetchRow($q1,array($contentId));
-		if(!$db->numberRows()){
+		$r1	= self::$db->fetch($q1,array($contentId));
+		if(!self::$db->numberRows()){
 			return false;
 		}
-		//$d1 = procesarContenido($d1,$bl);
-		return $r1;
+		$ret = array();
+		if($group){
+		    foreach ($r1 as $d1) {
+        		//$d1 = procesarContenido($d1,$bl);
+		        $ret[] = $d1;
+		    }
+		}else{
+		    $ret = $r1[0];
+		}
+		return $ret;
 	}
-	public static function children($contentId=null,$solovisible=true,$completo=false){
+	public static function children($contentId=null,$visible=true,$completeData=false){
 	    $contentId   = intval($contentId,10);
         $contentId   = $contentId ? $contentId : self::$contentId;
 
 		if(!isset( self::$flatMap[$contentId] )){
 			return false;
 		}
-		$level	= self::$flatMap[$contentId][_CONT_IDNIVEL] + 1;
+		$level	= self::$flatMap[$contentId][DbConf::$_CONT_LEVELID] + 1;
 		$params	= self::$contentId == $contentId ? self::$contentParams : self::params($contentId);
 
 		if(!isset(self::$relMap[$level][$contentId])){
@@ -227,34 +252,24 @@ class ContentMap {
 		}
 
 		$nav = array();
-		foreach($this->map[$level][$contentId] as $k1=>$v1){
-			if ($solovisible) {
-				if ($v1[_CONT_VISIBLE] > 0){
-					if($completo){
-						$nav []	= $this->datos_contenido($k1,1);
-					}else{
-						$nav[]	= array(
-							_CONT_ID		=> $k1
-							,_CONT_TITULO	=> stripslashes($v1[_CONT_TITULO])
-							,_CONT_FECHA	=> $v1[_CONT_FECHA]
-							,_CONT_ORDEN	=> $v1[_CONT_ORDEN]
-						);
-					}
-				}
-			} else {
-				if($completo){
-					$nav[]	= $this->datos_contenido($k1,1);
-				}else{
-					$nav[]	= array(
-						_CONT_ID		=> $k1
-						,_CONT_TITULO	=> stripslashes($v1[_CONT_TITULO])
-						,_CONT_FECHA	=> $v1[_CONT_FECHA]
-						,_CONT_ORDEN	=> $v1[_CONT_ORDEN]
-					);
-				}
+		$idList = array();
+		while (list($k1,$v1) = each(self::$relMap[$level][$contentId])) {
+			if (!$v1[DbConf::$_CONT_VISIBLE] && $visible) {
+			    continue;
 			}
+		    $idList[] = $k1;
+			$nav[]	= array(
+				DbConf::$_CONT_ID      => $k1,
+				DbConf::$_CONT_TITLE   => $v1[DbConf::$_CONT_TITLE],
+				DbConf::$_CONT_DATE    => $v1[DbConf::$_CONT_DATE],
+				DbConf::$_CONT_ORDER   => $v1[DbConf::$_CONT_ORDER],
+			);
 		}
-		$nav	= array_asoc_sort($nav,$params['orderBy'],$params['orderDir']);
+		reset(self::$relMap[$level][$contentId]);
+		if($completeData){
+		    $nav = self::data($idList);
+		}
+		//$nav	= array_asoc_sort($nav,$params['orderBy'],$params['orderDir']);
 		return $nav;
 	}
 }
