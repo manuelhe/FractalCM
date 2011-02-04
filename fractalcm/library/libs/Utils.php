@@ -111,7 +111,9 @@ class Utils{
 	//public port for ref_build_querystring
 	static function build_querystring($getArr){
 		if(is_array($getArr))
-			return self::ref_build_querystring($getArr, '', '');
+			$qs = self::ref_build_querystring($getArr, '', '');
+			$hash=(isset($getArr['#']))?"#".urlencode($getArr['#']):'';
+			return $qs.$hash;
 		return (string) $getArr;
 	}
 
@@ -119,15 +121,18 @@ class Utils{
 	private static function ref_build_querystring(&$newGet, $start, $end){
 		$qstr='';
 		foreach($newGet as $var=>$value){
-			if(is_array($value)){
-				$qstr.="&".self::ref_build_querystring($value, $var."[", "]");
-			} else {
-				$qstr.="&";
-				if($start && $end){
-					$qstr.=$start.$var.$end."=".urlencode($value);
-				} else $qstr.=$var."=".urlencode($value);
+			if($var!='#'){
+				if(is_array($value)){
+					$qstr.="&".self::ref_build_querystring($value, $start.$var.$end."[", "]");
+				} else {
+					$qstr.="&";
+					if($start && $end){
+						$qstr.=$start.$var.$end."=".urlencode($value);
+					} else $qstr.=$var."=".urlencode($value);
+				}
 			}
 		}
+		
 		return substr($qstr, 1);
 	}
 	
@@ -175,6 +180,19 @@ class Utils{
 	    return false;
 	}
 	
+	//same as shuffle but works with associative arrays
+	function shuffle($array) {
+	    $keys = array_keys($array);
+
+	    shuffle($keys);
+		$new = array();
+	    foreach($keys as $key) {
+	        $new[$key] = $array[$key];
+	    }
+
+	    return $new;
+	}
+	
 	//generate password
 	static function generate_password(){
 		
@@ -201,6 +219,10 @@ class Utils{
 
 		# done!
 		return $password;
+	}
+	
+	static function is_assoc($array) {
+	    return (is_array($array) && (count($array)==0 || 0 !== count(array_diff_key($array, array_keys(array_keys($array))) )));
 	}
 }
 ?>

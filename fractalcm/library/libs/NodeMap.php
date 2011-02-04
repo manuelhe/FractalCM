@@ -63,7 +63,7 @@ class NodeMap {
         );
         $r1 = self::$db->fetch($q1);
         if (!self::$db->numberRows()) {
-            trigger_error('<strong>NodeMap</strong> :: ERROR001: No data in Content table', E_USER_ERROR);
+            trigger_error('<strong>NodeMap</strong> :: ERROR 001: No data in Content table', E_USER_ERROR);
             return false;
         }
         $level = 1;
@@ -108,7 +108,7 @@ class NodeMap {
             //@todo Design and implement error handling for this
             //header("Location: "._URL_PREFIX._ID_ERROR."?ref=".self::$nodeId."&msg=IDNOVAL");
             //exit();
-            trigger_error('<strong>NodeMap</strong> :: NOTICE001: No Content from Submited ID', E_USER_NOTICE);
+            trigger_error('<strong>NodeMap</strong> :: NOTICE 001: No Content from Submited ID', E_USER_NOTICE);
         }
         self::$contentParams = self::params();
         return true;
@@ -127,7 +127,7 @@ class NodeMap {
         $q1    = "SELECT ".DbConf::$_NODE_PARAMS." FROM ".DbConf::$_TNODE." WHERE ".DbConf::$_NODE_ID."=?";
         $r1 = self::$db->fetchCell($q1,array($nodeId));
         if (!self::$db->numberRows()) {
-            trigger_error('<strong>NodeMap</strong> :: ERROR003: No Params in selected content', E_USER_ERROR);
+            trigger_error('<strong>NodeMap</strong> :: ERROR 003: No Params in selected content', E_USER_ERROR);
             return false;
         }
 
@@ -155,7 +155,7 @@ class NodeMap {
         $nodeId   = intval($nodeId,10);
         $nodeId   = $nodeId ? $nodeId : self::$nodeId;
         if(!isset(self::$flatMap[$nodeId])){
-            trigger_error('<strong>NodeMap</strong> :: NOTICE002: No Content from Submited ID', E_USER_NOTICE);
+            trigger_error('<strong>NodeMap</strong> :: NOTICE 002: No Content from Submited ID', E_USER_NOTICE);
         }
         $level       = self::$flatMap[$nodeId][DbConf::$_NODE_LEVELID];
         $path        = array();

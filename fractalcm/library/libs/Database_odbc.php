@@ -22,6 +22,7 @@ class Database_odbc extends Database {
 			trigger_error('<strong>Database</strong> :: ODBC Database connection failed', E_USER_WARNING);
 			return null;
 		}
+		$this->is_connected = true;
 		
 		switch($this->dsn_type){
 			case 'mssql':
@@ -87,7 +88,7 @@ class Database_odbc extends Database {
 	}
 
 	protected function _error() {
-		return odbc_errormsg($this->connection);
+		return $this->connection ? odbc_errormsg($this->connection) : "ODBC not connected";
 	}
 
 	

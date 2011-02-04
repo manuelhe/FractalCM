@@ -18,15 +18,17 @@ class Database_mysql extends Database {
 							));
 					
 		//tries connection
-		if(!$this->connection = mysql_connect(($args['host'].($args['port']?':'.$args['port']:'')), $args['user'], $args['password'])){
-			trigger_error('<strong>Database</strong> :: MySQL Database connection failed: ', E_USER_WARNING);
+		if(!$this->connection = mysql_connect(($args['host'].($args['port']?':'.$args['port']:'')), $args['user'], $args['password'], true)){
+			trigger_error('<strong>Database</strong> :: MySQL Database connection failed', E_USER_WARNING);
 			return null;
 		}
 		
 		//tries database selection
 		if(!@mysql_select_db($args['database'], $this->connection)){
 			trigger_error('<strong>Database</strong> :: MySQL Database selection failed: ' . $this->_error(), E_USER_WARNING);
+			return null;
 		}
+		$this->is_connected = true;
 		
 		//sets charset and collation
 		$this->execute("SET NAMES '".$args['charset']."' collate '".$args['collation']."'");
@@ -72,7 +74,7 @@ class Database_mysql extends Database {
 	}
 
 	protected function _error() {
-		return mysql_error($this->connection);
+		return $this->connection ? mysql_error($this->connection) : "MySQL not connected";
 	}
 
 	

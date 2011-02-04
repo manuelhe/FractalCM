@@ -32,7 +32,8 @@ class Image
 		'basename'=>null, 
 		'transparentColorRed'=>null,
 		'transparentColorGreen'=>null,
-		'transparentColorBlue'=>null);
+		'transparentColorBlue'=>null,
+		'quality'=>75);
 	
 	//this is a constant
 	private $save_defaults=array(
@@ -42,6 +43,9 @@ class Image
 						
 	//main image identifier
 	private $image=null;
+	
+	//main image what
+	private $watermark=null;
 	
 	//children images (thumbs, resizes, etc)
 	public $children=array();
@@ -86,12 +90,24 @@ class Image
 
 	}
 	
+	function __clone(){
+		// Force a copy of all references, otherwise
+		// it will point to same object.
+		
+		//replicate watermark
+		if($this->watermark) $this->watermark = clone $this->watermark;
+		
+		//replicate children
+		$imax = count($this->children);
+		for($i=0; $i<$imax; $i++) $this->children[$i]['instance'] = clone $this->children[$i]['instance'];
+	}
+	
 	//STATIC FUNCTIONS
 	
 	//load image from path
 	static function from_file($file){
 		$info=array();
-		$options=array();
+		$options = Utils::combine_args(func_get_args(), 1, array());
 		$image=null;
 		
 		//set location information
@@ -155,6 +171,8 @@ class Image
                 case 3:
                     // creates an image from file
                     $image = @imagecreatefrompng($options['path']);
+					imagealphablending($image, true);
+					imagesavealpha($image, true);
                     break;
                 default:
                     // if file has an unsupported extension
@@ -184,6 +202,8 @@ class Image
 			isset($this->options['transparentColorRed']) && 
 			isset($this->options['transparentColorGreen']) && 
 			isset($this->options['transparentColorBlue'])) {
+				
+				
 				$image['transparentColorRed']=$this->options['transparentColorRed'];
 				$image['transparentColorGreen']=$this->options['transparentColorGreen'];
 				$image['transparentColorBlue']=$this->options['transparentColorBlue'];
@@ -194,7 +214,17 @@ class Image
 								$image['transparentColorBlue']);
 	            imagefilledrectangle($image['resource'], 0, 0, $image['width'], $image['height'], $transparent);
 	            imagecolortransparent($image['resource'], $transparent);
-        }
+		//png transparency
+	    } elseif($this->info['type'] == 3){
+
+			imagealphablending($image['resource'], true);
+
+			$color = imagecolortransparent($image['resource'], imagecolorallocatealpha($image['resource'], 0, 0, 0, 127));
+
+			imagefill($image['resource'], 0, 0, $color);
+			imagesavealpha($image['resource'], true);
+
+		}
         // return new image resource
         return $image;
 	}
@@ -280,13 +310,13 @@ class Image
 			
 			case "#":
 				$width=$style['width'];
-				$height=$style['width'];
+				$height=$style['height'];
 				if($this->info['height']/$style['height'] > $this->info['width']/$style['width']){
 					
 					$o_height=(int)($this->info['width']*$style['height']/$style['width']);
 					$src_y=(int)(($this->info['height']-$o_height)/2);
 				} else {
-					$o_width=(int)($this->info['width']*$style['height']/$style['width']);
+					$o_width=(int)($this->info['height']*$style['width']/$style['height']);
 					$src_x=(int)(($this->info['width']-$o_width)/2);
 				}
 			break;
@@ -342,6 +372,31 @@ class Image
 		}
 	}
 	
+	
+	function set_watermark($file, $styles='all', $original_too=false){
+		
+		if(is_string($file)){
+			$this->watermark = Image::from_file($file);
+		} elseif(is_object($file)) {
+			$this->watermark = $file;
+		} else {
+			trigger_error('<strong>Image</strong> :: Unable to set watermark, incorrect file/resource format.', E_USER_WARNING);
+			return;
+		}
+		
+		//transforms children
+		foreach($this->children as $child){
+			if($styles=='all' || in_array($child['name'], $styles)) $child['instance']->set_watermark(clone $this->watermark);
+		}
+		
+		//transforms original
+		if($styles=='all' || $original_too){
+			$this->watermark->resize($this->info['width'].'x'.$this->info['height'].'#');
+			imagecopy($this->image, $this->watermark->image, 0, 0, 0, 0, $this->info['width'], $this->info['height']);
+		}
+		
+	}
+	
 	//FINAL FUNCTIONS
 	
 	//saves current image
@@ -386,20 +441,23 @@ class Image
 	                    trigger_error('<strong>Image</strong> :: GD does not support jpeg files.', E_USER_WARNING);
 	                    return false;
 	                // if, for some reason, file could not be created
-	                } elseif (@!imagejpeg($this->image, $this->options['path'])) {
+	                } elseif (@!imagejpeg($this->image, $this->options['path'], $this->options['quality'])) {
 	                    // save the error level and stop the execution of the script
 	                    trigger_error('<strong>Image</strong> :: Unknown error, unable to save jpeg file.', E_USER_WARNING);
 	                    return false;
 	                }
 	                break;
 	            case IMAGETYPE_PNG:
+					//calculate image quality
+					$pngQuality = ($this->options['quality'] - 100) / 11.111111;
+					$pngQuality = round(abs($pngQuality));
 	                // if gd support for this file type is not available
 	                if (!function_exists("imagepng")) {
 	                    // save the error level and stop the execution of the script
 	                    trigger_error('<strong>Image</strong> :: GD does not support png files.', E_USER_WARNING);
 	                    return false;
 	                // if, for some reason, file could not be created
-	                } elseif (@!imagepng($this->image, $this->options['path'])) {
+	                } elseif (@!imagepng($this->image, $this->options['path'], $pngQuality)) {
 	                    // save the error level and stop the execution of the script
 	                    trigger_error('<strong>Image</strong> :: Unknown error, unable to save png file.', E_USER_WARNING);
 	                    return false;

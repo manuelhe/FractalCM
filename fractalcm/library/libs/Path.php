@@ -44,9 +44,25 @@ class Path{
 	}
 	
 	//set base script
-	static function setBase($new_path){
+	static function setBase($new_path, $cur_file){
 		$me=&self::getInstance();
-		$me->script_base=$new_path;
+		$me->script_base = 	self::combine(
+								self::combine(
+									$new_path, 
+									self::relative($cur_file, $_SERVER['SCRIPT_FILENAME'])
+								), 
+								$_SERVER['SCRIPT_FILENAME']
+							).".";
+	}
+	
+	//set base script uri
+	static function setBaseUri($request_uri){
+		$me=&self::getInstance();
+		if(strpos("?", $request_uri)!==false){
+			$parts = explode("?", $request_uri);
+			$request_uri = $parts[0];
+		}
+		$me->script_base = self::combine(self::relative($request_uri, $_SERVER['SCRIPT_NAME']), $_SERVER['SCRIPT_FILENAME']).".";
 	}
 	 
 	//combine $curPath as base and relative $path to get new fullpath
@@ -101,11 +117,17 @@ class Path{
 		if(substr($pathTo, 0, 1)=="/") $pathTo=substr($pathTo, 1, strlen($pathTo)-1);
 		
 		//splits file
-		$tmp_arr=explode("/", $pathTo);
-		$add_after=$tmp_arr[count($tmp_arr)-1];
 		
+		if(substr($pathTo, -1, 1)=="/"){
+			$pathTo=dirname($pathTo.".").'/';
+			$add_after="";
+		} else {
+			$tmp_arr=explode("/", $pathTo);
+			$add_after=$tmp_arr[count($tmp_arr)-1];
+			$pathTo=dirname($pathTo).'/';
+		}
 		$pathFrom=dirname($pathFrom).'/';
-		$pathTo=dirname($pathTo).'/';
+		
 		
 		//strips common folders
 		$pf_len=strlen($pathFrom);
@@ -148,6 +170,19 @@ class Path{
 				'get_out'=>array(),
 				'#'=>''
 				));
+		$newGet = self::this_qs($args);
+		$qstr=Utils::build_querystring($newGet);
+		$var=(!empty($qstr))?"?".$qstr:'';
+		
+		return $_SERVER['SCRIPT_NAME'].$var;	
+	}
+	
+	static function this_qs(){
+		$args=Utils::combine_args(func_get_args(), 0, array(
+				'get_in'=>array(),
+				'get_out'=>array(),
+				'#'=>''
+				));
 		if(!is_array($args['get_in'])) $args['get_in']=array();
 		if(!is_array($args['get_out'])) $args['get_out']=array();
 		$newGet=array();
@@ -163,11 +198,8 @@ class Path{
 				$newGet[$name]=&$args['get_in'][$name];
 			}
 		}
-		$qstr=Utils::build_querystring($newGet);
-		$var=(!empty($qstr))?"?".$qstr:'';
-		$hash=(!empty($args['#']))?"#".$args['#']:'';
-		
-		return $_SERVER['SCRIPT_NAME'].$var.$hash;	
+		if(isset($args['#'])) $newGet['#']=$args['#'];
+		return $newGet;	
 	}
 	
 	//request uri for all systems (from Drupal)
