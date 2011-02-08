@@ -1,23 +1,23 @@
 <?php
-/*
-Database - enhanced dbfacile
-v0.2
-Based on greaterscope's dbFacile - A Database API that should have existed from the start
-Version 0.4.2
-http://www.greaterscope.net/projects/dbFacile
-
-Notes:
-functions declared starting with _ like _func() indicate functions that are not actually declareted in this class,
-but have to be implemented on the extended classes (eg. Database_mysql );
+/**
+ *
+ * Database - enhanced dbfacile
+ * v0.2
+ * Based on greaterscope's dbFacile - A Database API that should have existed from the start
+ * Version 0.4.2
+ * http://www.greaterscope.net/projects/dbFacile
+ *
+ * Notes:
+ * functions declared starting with _ like _func() indicate functions that are not actually declarated in this class,
+ * but have to be implemented on the extended classes (eg. Database_mysql );
 */
-
 abstract class Database {
 	protected $connection; 				// Database connection resource
 	protected $name; 					// connection name
 	public $is_connected = false;	//connection status
-	
+
 	private static $types = array('mysql', 'odbc', 'sqlite', 'mssql');
-	
+
 	protected $result;					//used to store results
 
 	public static $instance; 			// last created instance
@@ -25,7 +25,9 @@ abstract class Database {
 	public static $last_instance_id;	//used to store $this instance number
 	public static $instances = array();	// for holding more than 1 instance
 
-	//general construct
+	/**
+	 * general construct
+	 */
 	function __construct() {
 
 		//get options
@@ -161,7 +163,9 @@ abstract class Database {
 
 		//if there's an error, report it
 		if(!$this->result && (error_reporting() & 1))
-			trigger_error('<strong>Database</strong> :: Error in query: ' . $this->_error(), E_USER_WARNING);
+			trigger_error('<strong>Database</strong> :: Error in query: ' . $this->_error()
+			    .'<br/><br/>Query: '.$fullSql.'<br/><br/>'
+			, E_USER_WARNING);
 
 		return $this->result?true:false;
 	}
@@ -341,7 +345,7 @@ abstract class Database {
 		} else
 			return array();
 	}
-	
+
 	function __destruct() {
 		if ($this->connection) {
 			$this -> close();

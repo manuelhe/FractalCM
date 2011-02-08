@@ -7,9 +7,24 @@ require_once 'config/LangConf.php';
 require_once 'config/DbConf.php';
 require_once 'config/NodeParams.php';
 
+
+
+//$db        = Database::open(array('type'=>'mysql','database'=>'iac', 'user'=>'root', 'password'=>'zemoga'));
+//var_dump($db->fetchCell("SELECT email FROM accounts WHERE username=?",array('yahooa')));
+
+$cache = wrapperCache::GetInstance('dbcache',360,array(
+	'type'=>'mysql',
+	'database'=>'fractalcms_db1',
+	'user'=>'root',
+    'password'=>'zemoga',
+    'table'=>'fw_cache'
+));
+//$cache->testcache = '3254654657411 adkhasd 5435454 asd asdas';
+echo $cache->cache('testcache');
+
 //$dbconfig = dbConfig::init();
 //echo $dbconfig::$_TSUFIX;
-$id = 3;
+$id = 23;
 echo "<h1>Bootstrap Test for ID: {$id}</h1>";
 $contentMap = NodeMap::init($id);
 
